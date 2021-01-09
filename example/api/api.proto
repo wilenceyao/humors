@@ -1,0 +1,13 @@
+syntax = "proto3";
+package api;
+
+option go_package = "github.com/wilenceyao/humors/example/api";
+
+message SumRequest {
+    int32 a = 1;
+    int32 b = 2;
+}
+
+message SumResponse {
+    int32 sum = 1;
+}
