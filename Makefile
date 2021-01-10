@@ -5,4 +5,4 @@ lint:
 
 protoc:
 	protoc --go_out=. --go_opt=paths=source_relative humors.proto
-	protoc --go_out=. --go_opt=paths=source_relative example/api/api.proto
+	protoc --go_out==plugins=humors:. --go_opt=paths=source_relative example/api/api.proto

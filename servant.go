@@ -2,6 +2,7 @@ package humors
 
 import (
 	"context"
+	"fmt"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"google.golang.org/protobuf/proto"
 	"log"
@@ -10,30 +11,28 @@ import (
 	"time"
 )
 
-type servantFun struct {
+type MethodDesc struct {
 	ReqType reflect.Type
-	ResType reflect.Type
-	Fun     func(ctx context.Context, req interface{}, res interface{})
+	Fun     func(ctx context.Context, req proto.Message) (proto.Message, error)
 }
 
 type HumorServant struct {
-	topic  string
-	client MQTT.Client
-	funs   sync.Map
+	topic   string
+	client  MQTT.Client
+	funs    sync.Map
+	service string
 }
 
 func (s *HumorServant) init() {
 	s.funs = sync.Map{}
-	// s.client.AddRoute(s.topic, s.MessageHandler)
 	s.client.Subscribe(s.topic, qos, s.MessageHandler)
 }
 
-func (s *HumorServant) RegisterFun(action int32, req interface{}, res interface{},
-	fun func(ctx context.Context, req interface{}, res interface{})) {
+func (s *HumorServant) RegisterMethod(action string, req interface{},
+	fun func(ctx context.Context, req proto.Message) (proto.Message, error)) {
 	log.Println(INFO, SERVANT, "register fun:", action)
-	f := &servantFun{
+	f := &MethodDesc{
 		ReqType: reflect.TypeOf(req),
-		ResType: reflect.TypeOf(res),
 		Fun:     fun,
 	}
 	s.funs.Store(action, f)
@@ -49,7 +48,6 @@ func (s *HumorServant) MessageHandler(_ MQTT.Client, message MQTT.Message) {
 		log.Println(ERROR, SERVANT, "unmarshal reqPkt err:", err)
 		return
 	}
-	log.Println(DEBUG, SERVANT, "recv req:", reqPkt.ReqID)
 	go s.executeRpc(reqPkt)
 }
 
@@ -74,20 +72,24 @@ func (s *HumorServant) internalExecuteRpc(ctx context.Context, reqPkt *RequestPa
 		resPkt.Code = ErrorCode_NOFUNCERR
 		return resPkt
 	}
-	fun := f.(*servantFun)
-	req := reflect.New(fun.ReqType).Interface()
-	res := reflect.New(fun.ResType).Interface()
-	err := proto.Unmarshal(reqPkt.Payload, req.(proto.Message))
+	fun := f.(*MethodDesc)
+	req := reflect.New(fun.ReqType).Interface().(proto.Message)
+	err := proto.Unmarshal(reqPkt.Payload, req)
 	if err != nil {
 		log.Println(ERROR, SERVANT, "req payload unmarshal err:", err)
 		resPkt.Code = ErrorCode_ENCODEERR
 		return resPkt
 	}
 	begin := time.Now().UnixNano() / 1e6
-	fun.Fun(ctx, req, res)
+	res, err := fun.Fun(ctx, req)
 	end := time.Now().UnixNano() / 1e6
-	log.Println(DEBUG, SERVANT, "rpc:", reqPkt.Action, "reqTime:", begin,
+	rpc := fmt.Sprintf("%s/%s", s.service, reqPkt.Action)
+	log.Println(DEBUG, SERVANT, "rpc:", rpc, "reqTime:", begin,
 		"resTime:", end, "cost: ", end-begin)
+	if err != nil {
+		resPkt.Code = ErrorCode_SERVICEERR
+		return resPkt
+	}
 	resBtArr, err := proto.Marshal(res.(proto.Message))
 	if err != nil {
 		resPkt.Code = ErrorCode_ENCODEERR

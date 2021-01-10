@@ -1,6 +1,7 @@
 package humors
 
 import (
+	"context"
 	"fmt"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"google.golang.org/protobuf/proto"
@@ -18,6 +19,11 @@ type HumorAdaptor struct {
 	resp   sync.Map
 	// ms
 	timeout int32
+	service string
+}
+
+type ClientConnInterface interface {
+	Invoke(ctx context.Context, topic string, method string, args interface{}, reply interface{}) error
 }
 
 func (a *HumorAdaptor) init() {
@@ -44,22 +50,19 @@ func (a *HumorAdaptor) MessageHandler(_ MQTT.Client, message MQTT.Message) {
 	ch.(chan *ResponsePacket) <- resPkt
 }
 
-func (a *HumorAdaptor) Call(clientID string, action int32,
+func (a *HumorAdaptor) Call(ctx context.Context, clientID string, action string,
 	req proto.Message, res proto.Message) error {
-	return a.CallTopic(formatRecvReqTopic(clientID), action, req, res)
-}
-
-func (a *HumorAdaptor) CallTopic(topic string, action int32,
-	req proto.Message, res proto.Message) error {
+	topic := formatServantRecvReqTopic(clientID, a.service)
 	begin := time.Now().UnixNano() / 1e6
 	err := a.internalCallRpc(topic, action, req, res)
 	end := time.Now().UnixNano() / 1e6
-	log.Println(DEBUG, ADAPTOR, "topic:", topic, "rpc:", action, "reqTime:", begin,
+	rpc := fmt.Sprintf("%s/%s", a.service, action)
+	log.Println(DEBUG, ADAPTOR, "rpc:", rpc, "reqTime:", begin,
 		"resTime:", end, "cost:", end-begin)
 	return err
 }
 
-func (a *HumorAdaptor) internalCallRpc(topic string, action int32,
+func (a *HumorAdaptor) internalCallRpc(topic string, action string,
 	req proto.Message, res proto.Message) error {
 	reqID := atomic.AddInt32(&a.reqID, 1)
 	reqBtArr, err := proto.Marshal(req)

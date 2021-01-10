@@ -3,25 +3,26 @@ package humors;
 option go_package = "github.com/wilenceyao/humors";
 
 enum ErrorCode {
-     SUCCESS = 0;
-     DECODEERR = 1;
-     ENCODEERR = 2;
-     NOFUNCERR = 3;
-     NOSERVANTERR = 4;
-     CONNECTERR = 5;
-     TIMEOUT = 6;
+  SUCCESS = 0;
+  DECODEERR = 1;
+  ENCODEERR = 2;
+  NOFUNCERR = 3;
+  NOSERVANTERR = 4;
+  CONNECTERR = 5;
+  TIMEOUT = 6;
+  SERVICEERR = 7;
 }
 
 message RequestPacket {
-    int32 reqID = 1;
-    int32 action = 2;
-    int32 timeout = 3;
-    bytes payload = 4;
-    string resTopic = 5;
+  int32 reqID = 1;
+  string action = 2;
+  int32 timeout = 3;
+  bytes payload = 4;
+  string resTopic = 5;
 }
 
 message ResponsePacket {
-    int32 reqID = 1;
-    ErrorCode code = 2;
-    bytes payload = 3;
+  int32 reqID = 1;
+  ErrorCode code = 2;
+  bytes payload = 3;
 }
