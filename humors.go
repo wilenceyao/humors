@@ -5,6 +5,7 @@ import (
 	"fmt"
 	MQTT "github.com/eclipse/paho.mqtt.golang"
 	"log"
+	"time"
 )
 
 type Humors struct {
@@ -38,6 +39,10 @@ func NewHumors(opts Options) (*Humors, error) {
 	log.Println(DEBUG, "NewHumors")
 	if opts.MQTTOpts == nil {
 		return nil, errors.New("invalid opts")
+	}
+	opts.MQTTOpts.AutoReconnect = true
+	if opts.MQTTOpts.MaxReconnectInterval == 0 {
+		opts.MQTTOpts.MaxReconnectInterval = time.Second * 2
 	}
 	c := MQTT.NewClient(opts.MQTTOpts)
 	if token := c.Connect(); token.Wait() && token.Error() != nil {
